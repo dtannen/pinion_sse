@@ -1,13 +1,29 @@
 package main
 
 import (
+	"log"
+	"os"
 	"time"
 
 	"github.com/dtannen/sseserver"
+	"github.com/garyburd/redigo/redis"
 )
 
 func main() {
 	s := sseserver.NewServer()
+
+	redisHost := os.Getenv("REDIS_HOST")
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+	if redisHost == "" {
+		redisHost = "localhost:6379"
+	}
+	if redisPassword == "" {
+		redisPassword = ""
+	}
+	pool := newPool(redisHost, redisPassword)
+
+	NewBroadcastHandler(pool, s)
+
 	go func() {
 		ticker := time.Tick(time.Duration(1 * time.Second))
 		for {
@@ -19,5 +35,30 @@ func main() {
 			s.Broadcast <- sseserver.SSEMessage{"", data, "/time"}
 		}
 	}()
+
 	s.Serve(":8001")
+}
+
+func newPool(host, password string) *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     2,
+		MaxActive:   5,
+		IdleTimeout: 5 * time.Second,
+		Wait:        true,
+		Dial: func() (redis.Conn, error) {
+			c, err := redis.Dial("tcp", host)
+			if err != nil {
+				log.Println(err)
+				return nil, err
+			}
+			if password != "" {
+				if _, err := c.Do("AUTH", password); err != nil {
+					log.Println(err)
+					c.Close()
+					return nil, err
+				}
+			}
+			return c, err
+		},
+	}
 }
