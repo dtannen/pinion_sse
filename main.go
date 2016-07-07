@@ -11,12 +11,16 @@ import (
 
 func main() {
 	s := sseserver.NewServer()
-
 	redisHost := os.Getenv("REDIS_HOST")
 	redisPassword := os.Getenv("REDIS_PASSWORD")
-	if redisHost == "" {
-		redisHost = "localhost:6379"
+	redisPort := os.Getenv("REDIS_PORT")
+	if redisPort == "" {
+		redisPort = "6379"
 	}
+	if redisHost == "" {
+		redisHost = "localhost"
+	}
+	redisHost = redisHost + ":" + redisPort
 	if redisPassword == "" {
 		redisPassword = ""
 	}
